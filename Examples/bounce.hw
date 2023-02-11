@@ -1,0 +1,6 @@
+// Bouncing ball example
+v:=5; p:=10; c:=0;
+while (c<4) do {
+  v'=-9.8, p'=v until p<0 && v<0;
+  v:=-0.5*v; c:=c+1;
+}
