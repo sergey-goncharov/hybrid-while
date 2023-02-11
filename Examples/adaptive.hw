@@ -1,0 +1,12 @@
+// Adaptive cruise control
+// -- Follower --
+p:=0; v:=0;     // position and velocity
+// -- Leader --
+pl:=50; vl:=10; // position and velocity
+while true do{
+  if (p+v+2.5 < pl+10) &&
+     ((v-5)^2 +
+      4*(p+v+2.5-pl-10) < 0)
+  then p'=v,v'=5,pl'=10 for 1;
+  else p'=v,v'=-2,pl'=10 for 1;
+}
