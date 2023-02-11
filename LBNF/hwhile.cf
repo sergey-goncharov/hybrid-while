@@ -1,0 +1,97 @@
+entrypoints Prog ;
+
+-- Basics
+
+comment "//" ;
+comment "/*" "*/" ;
+
+token Nat  (digit (digit)*) ;
+token Flo  ((digit (digit)*)? '.' (digit(digit)*)) ;
+token Id   (lower (letter | digit | '_')*) ;
+token Der  (lower (letter | digit | '_')*'\'') ;
+
+-- Arithmetic Expessions
+
+ArId.       ArExp3 ::= Id ;
+ArNat.      ArExp3 ::= Nat ;
+ArFloat.    ArExp3 ::= Flo ;
+
+Times.      ArExp2 ::= ArExp2 "*" ArExp3 ;
+Divide.     ArExp2 ::= ArExp2 "/" ArExp3 ;
+
+Plus.       ArExp1 ::= ArExp1 "+" ArExp2 ;
+Minus.      ArExp1 ::= ArExp1 "-" ArExp2 ;
+
+Exp.        ArExp1 ::= ArExp2 "^" Nat ;
+UMinus.     ArExp1 ::= "-" ArExp2 ;
+_.          ArExp1 ::= "+" ArExp2 ;
+
+_.          ArExp3 ::= "(" ArExp1 ")" ;
+_.          ArExp2 ::= ArExp3 ;
+_.          ArExp1 ::= ArExp2 ;
+_.          ArExp  ::= ArExp1 ;
+
+-- Logical Expessions
+
+F.          LogExp3 ::= "false" ;
+T.          LogExp3 ::= "true" ;
+LogId.      LogExp3 ::= Id ;
+
+Le.         LogExp3 ::= ArExp "<"  ArExp ;
+Ge.         LogExp3 ::= ArExp ">"  ArExp ;
+Eq.         LogExp3 ::= ArExp "==" ArExp ;
+Leq.        LogExp3 ::= ArExp "<=" ArExp ;
+Geq.        LogExp3 ::= ArExp ">=" ArExp ;
+Neq.        LogExp3 ::= ArExp "!=" ArExp ;
+And.        LogExp2 ::= LogExp2 "&&" LogExp3 ;
+Or.         LogExp1 ::= LogExp1 "||" LogExp2 ;
+
+Not.        LogExp1 ::= "!" LogExp2 ;
+
+_.          LogExp3  ::= "(" LogExp1 ")" ;
+_.          LogExp2  ::= LogExp3 ;
+_.          LogExp1  ::= LogExp2 ;
+_.          LogExp   ::= LogExp1 ;
+
+-- Programms
+
+-- This would be an attempt to solve a semantic issue with the parser
+-- Prog.       Prog ::= Asg ";" [Stm] ;
+-- So, no
+
+Prog.       Prog ::= [Stm] ;
+AsgAr.      Asg  ::= Id ":=" ArExp ;
+AsgLog.     Asg  ::= Id ":=" LogExp ;
+
+separator Stm ";";
+separator nonempty Eqn "," ;
+
+-- this is only needed due to a bug in bnfc:
+-- https://github.com/BNFC/bnfc/issues/436
+DEqp.       Eqn  ::= Der "=" ArExp ;    
+DEq.        Eqn  ::= Id "'" "=" ArExp ;
+
+AsStm.      Stm ::= Asg ;
+For.        Stm ::= [Eqn] "for" ArExp ;
+Until.      Stm ::= [Eqn] "until" LogExp ;
+If.         Stm ::= "if" LogExp "then" [Stm] "else" [Stm] ;
+While.      Stm ::= "while" LogExp "do" [Stm] ;
+Wait.       Stm ::= "wait"  ArExp ;
+
+_ .         Stm ::= Stm ";" ;
+
+-- Definitions
+
+asg_prog.   Prog ::= Asg ;
+define      asg_prog a = Prog [AsStm a] ;
+
+if_curl1.   Stm ::= "if" LogExp "then" "{" [Stm] "}" "else" [Stm] ;
+if_curl2.   Stm ::= "if" LogExp "then" [Stm] "else" "{" [Stm] "}" ;
+if_curl3.   Stm ::= "if" LogExp "then" "{" [Stm] "}" "else" "{" [Stm] "}" ;
+
+define      if_curl1 a b c = If a b c ;
+define      if_curl2 a b c = If a b c ;
+define      if_curl3 a b c = If a b c ;
+
+wh_curl.    Stm ::= "while" LogExp "do" "{" [Stm] "}" ;
+define      wh_curl a b = While a b ;
