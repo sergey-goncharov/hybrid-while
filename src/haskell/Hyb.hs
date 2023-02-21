@@ -38,6 +38,12 @@ data Bound s = Bound {
   dur :: Maybe Time               -- possible explicit bound
 } 
 
+predBound :: (s -> Bool) -> Bound s
+predBound p = Bound p Nothing
+
+numBound :: Time -> Bound s
+numBound d = Bound (const True) $ Just d 
+
 data HybSym s a = HybSym {runHybSym :: s -> TrajSeq s a}
 data TrajSeq s a = TrivTraj a s | ConsTraj (SymTraj s) (Bound s) (HybSym s a)
 
@@ -51,7 +57,7 @@ instance Applicative (HybSym s) where
 instance Monad (HybSym s) where
   return = HybSym . TrivTraj
   
-  (HybSym f) >>= g = HybSym $ \init -> case (f init) of 
+  HybSym f >>= g = HybSym $ \init -> case (f init) of 
                         TrivTraj x next -> runHybSym (g x) next 
                         ConsTraj t d r  -> ConsTraj t d $ r >>= g
     
@@ -70,7 +76,7 @@ odeTraj :: (Time -> s -> s) -> Bound s -> HybSym s s
 odeTraj f d = HybSym $ \init -> ConsTraj (OdeTraj init f) d (state $ \s -> (s, s))
 
 wait :: Time -> HybSym a a
-wait d = funTraj (const id) (Bound (const True) $ Just d) 
+wait d = funTraj (const id) (numBound d) 
 
 sample :: HybSym [Double] a -> [Double] -> Stream Time -> Stream [Double]
 
@@ -94,7 +100,7 @@ ts = linspace 100 (0,20)
 sol = odeSolve xdot [10,0] ts
 
 -- A ball
-ball = odeTraj xdot (Bound (\[x,v] -> x >0 || v >=0) Nothing)
+ball = odeTraj xdot $ predBound (\[x,v] -> x >0 || v >=0)
 
 -- A bouncing ball
 bball = do ball; [x,v] <- get; put [x, -0.6 * v]; bball
