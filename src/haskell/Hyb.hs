@@ -23,16 +23,19 @@ showL []       = putStrLn "empty"
 showL [x]      = putStrLn $ show x
 showL (x : xs) = (putStrLn $ show x) >> showL xs
 
-data SymTraj s = Ode {
-  init  :: s,               -- initial value
-  flow  :: Time -> s -> s   -- eqations
-}
-  -- explicitly given funTraj:
-  | Traj {runTraj :: Time -> s -> s} 
+data SymTraj s = OdeTraj { 
+-- trajectory specified by ode
+    init  :: s,                   -- initial value
+    flow  :: Time -> s -> s       -- eqations
+} |
+  FunTraj {   
+-- explicitly given trajectory
+    runTraj :: Time -> s -> s
+} 
 
 data Bound s = Bound {
-  inv :: s -> Bool,         -- must hold throughout 
-  dur :: Maybe Time         -- possible explicit bound
+  inv :: s -> Bool,               -- must hold throughout 
+  dur :: Maybe Time               -- possible explicit bound
 } 
 
 data HybSym s a = HybSym {runHybSym :: s -> TrajSeq s a}
@@ -61,10 +64,10 @@ instance MonadState s (HybSym s) where
   state p = HybSym $ \init -> let (x, next) = p init in TrivTraj x next 
 
 funTraj :: (Time -> s -> s) -> Bound s -> HybSym s s
-funTraj f d = HybSym $ \s -> ConsTraj (Traj $ \t s' -> f t s) d (state $ \s -> (s, s))
+funTraj f d = HybSym $ \init -> ConsTraj (FunTraj $ \t -> const $ f t init) d (state $ \s -> (s, s))
 
 odeTraj :: (Time -> s -> s) -> Bound s -> HybSym s s
-odeTraj f d = HybSym $ \s -> ConsTraj (Ode s f) d (state $ \s -> (s, s))
+odeTraj f d = HybSym $ \init -> ConsTraj (OdeTraj init f) d (state $ \s -> (s, s))
 
 wait :: Time -> HybSym a a
 wait d = funTraj (const id) (Bound (const True) $ Just d) 
@@ -74,12 +77,12 @@ sample :: HybSym [Double] a -> [Double] -> Stream Time -> Stream [Double]
 sample (HybSym f) init [] = []
 sample (HybSym f) init xs@(x : _) = 
   case (f init) of 
-    (TrivTraj _ next)                 -> map (const next) xs
-    (ConsTraj (Traj f) (Bound p d) r) -> 
+    (TrivTraj _ next)                    -> map (const next) xs
+    (ConsTraj (FunTraj f) (Bound p d) r) -> 
        let (ys, zs) = break (\t -> not (p $ f (t - x) init) || maybe False (t - x>) d) xs in
        map (\t -> f (t - x) init) ys ++ if (null zs) then [] else f (head zs - x) init : sample r (f (head zs - x) init) (tail zs)
      
-    (ConsTraj (Ode i f) (Bound p d) r) -> 
+    (ConsTraj (OdeTraj i f) (Bound p d) r) -> 
        let sol      = zip xs $ map toList $ toRows $ odeSolve f i (fromList xs);
            (ys, zs) = break (\(t, v) -> not (p v) || maybe False (t - x>) d) sol in
        map snd ys ++ if (null zs) then [] else (snd $ head zs) : sample r (snd $ head zs) (map fst $ tail zs)
